@@ -146,6 +146,28 @@ const SoundMeter = () => {
     }
   };
 
+  const stopMeasurement = useCallback(() => {
+    setIsActive(false);
+    cleanup();
+    
+    const measurements = measurementsRef.current;
+    if (measurements.length > 0) {
+      const max = Math.max(...measurements);
+      const avg = measurements.reduce((a, b) => a + b, 0) / measurements.length;
+      setMaxDb(Math.round(max));
+      setAvgDb(Math.round(avg));
+      setShowGraph(true);
+    }
+  }, [cleanup]);
+
+  const handleButtonClick = () => {
+    if (isActive) {
+      stopMeasurement();
+    } else {
+      startMeasurement();
+    }
+  };
+
   const formatValue = (value: number | null): string => {
     return value !== null ? `${value}` : "--";
   };
@@ -221,13 +243,12 @@ const SoundMeter = () => {
         </p>
       )}
 
-      {/* Start button */}
+      {/* Start/Stop button */}
       <button
-        onClick={startMeasurement}
-        disabled={isActive}
-        className="px-6 sm:px-8 py-3 sm:py-4 text-lg sm:text-xl md:text-2xl border border-foreground text-foreground bg-transparent hover:bg-foreground hover:text-background active:bg-foreground active:text-background transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground"
+        onClick={handleButtonClick}
+        className="px-6 sm:px-8 py-3 sm:py-4 text-lg sm:text-xl md:text-2xl border border-foreground text-foreground bg-transparent hover:bg-foreground hover:text-background active:bg-foreground active:text-background transition-colors duration-200"
       >
-        Start (30s)
+        {isActive ? "Stop" : "Start"}
       </button>
     </div>
   );
