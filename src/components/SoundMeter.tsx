@@ -172,7 +172,7 @@ const SoundMeter = () => {
           Max: <span className="text-foreground font-medium">{formatValue(maxDb)}</span> dB
         </p>
         <p className="text-2xl md:text-3xl lg:text-4xl text-muted-foreground">
-          Medel: <span className="text-foreground font-medium">{formatValue(avgDb)}</span> dB
+          Avg: <span className="text-foreground font-medium">{formatValue(avgDb)}</span> dB
         </p>
       </div>
 
@@ -210,7 +210,7 @@ const SoundMeter = () => {
         disabled={isActive}
         className="px-8 py-4 text-xl md:text-2xl border border-foreground text-foreground bg-transparent hover:bg-foreground hover:text-background transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground"
       >
-        Starta mätning (30s)
+        Start (30s)
       </button>
     </div>
   );
