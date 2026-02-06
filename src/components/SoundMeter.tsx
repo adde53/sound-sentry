@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-const MEASUREMENT_DURATION = 60; // seconds
+const MEASUREMENT_DURATION = 30; // seconds
 const UPDATE_INTERVAL = 50; // ms
+const GRAPH_SAMPLE_INTERVAL = 1; // seconds between graph samples
 
 const SoundMeter = () => {
   const [currentDb, setCurrentDb] = useState<number | null>(null);
@@ -107,8 +108,8 @@ const SoundMeter = () => {
         setCurrentDb(roundedDb);
         measurementsRef.current.push(db);
 
-        // Update history for graph (sample every 500ms)
-        if (elapsed - lastHistoryUpdate >= 0.5) {
+        // Update history for graph (sample every GRAPH_SAMPLE_INTERVAL seconds)
+        if (elapsed - lastHistoryUpdate >= GRAPH_SAMPLE_INTERVAL) {
           setHistory(prev => [...prev, db]);
           lastHistoryUpdate = elapsed;
         }
@@ -209,7 +210,7 @@ const SoundMeter = () => {
         disabled={isActive}
         className="px-8 py-4 text-xl md:text-2xl border border-foreground text-foreground bg-transparent hover:bg-foreground hover:text-background transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground"
       >
-        Starta mätning (60s)
+        Starta mätning (30s)
       </button>
     </div>
   );
