@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
 const MEASUREMENT_DURATION = 30; // seconds
-const UPDATE_INTERVAL = 50; // ms
 const GRAPH_SAMPLE_INTERVAL = 1; // seconds between graph samples
+const SMOOTHING_SAMPLES = 8; // number of samples to average for display stability
 
 const SoundMeter = () => {
   const [currentDb, setCurrentDb] = useState<number | null>(null);
@@ -18,7 +18,9 @@ const SoundMeter = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
   const measurementsRef = useRef<number[]>([]);
+  const recentSamplesRef = useRef<number[]>([]);
   const startTimeRef = useRef<number>(0);
+  const lastDisplayUpdateRef = useRef<number>(0);
 
   const cleanup = useCallback(() => {
     if (animationRef.current) {
@@ -68,7 +70,9 @@ const SoundMeter = () => {
       source.connect(analyser);
 
       measurementsRef.current = [];
+      recentSamplesRef.current = [];
       startTimeRef.current = Date.now();
+      lastDisplayUpdateRef.current = 0;
       setIsActive(true);
       setShowGraph(false);
       setHistory([]);
@@ -103,21 +107,34 @@ const SoundMeter = () => {
 
         analyser.getByteTimeDomainData(dataArray);
         const db = calculateDb(dataArray);
-        const roundedDb = Math.round(db);
-
-        setCurrentDb(roundedDb);
+        
+        // Store for statistics
         measurementsRef.current.push(db);
+        
+        // Add to recent samples for smoothing
+        recentSamplesRef.current.push(db);
+        if (recentSamplesRef.current.length > SMOOTHING_SAMPLES) {
+          recentSamplesRef.current.shift();
+        }
+        
+        // Update display value every 200ms with smoothed average
+        const now = Date.now();
+        if (now - lastDisplayUpdateRef.current >= 200) {
+          const smoothedDb = recentSamplesRef.current.reduce((a, b) => a + b, 0) / recentSamplesRef.current.length;
+          setCurrentDb(Math.round(smoothedDb));
+          lastDisplayUpdateRef.current = now;
+          
+          // Update max and avg
+          const measurements = measurementsRef.current;
+          setMaxDb(Math.round(Math.max(...measurements)));
+          setAvgDb(Math.round(measurements.reduce((a, b) => a + b, 0) / measurements.length));
+        }
 
         // Update history for graph (sample every GRAPH_SAMPLE_INTERVAL seconds)
         if (elapsed - lastHistoryUpdate >= GRAPH_SAMPLE_INTERVAL) {
           setHistory(prev => [...prev, db]);
           lastHistoryUpdate = elapsed;
         }
-
-        // Update max and avg in real-time
-        const measurements = measurementsRef.current;
-        setMaxDb(Math.round(Math.max(...measurements)));
-        setAvgDb(Math.round(measurements.reduce((a, b) => a + b, 0) / measurements.length));
 
         animationRef.current = requestAnimationFrame(measure);
       };
@@ -155,30 +172,30 @@ const SoundMeter = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8 py-12">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12">
       {/* Main dB value */}
-      <div className="text-center mb-12">
-        <span className="text-[12rem] md:text-[16rem] lg:text-[20rem] font-bold leading-none tracking-tighter">
+      <div className="text-center mb-6 sm:mb-12">
+        <span className="text-[8rem] sm:text-[12rem] md:text-[16rem] lg:text-[20rem] font-bold leading-none tracking-tighter tabular-nums">
           {formatValue(currentDb)}
         </span>
-        <span className="text-4xl md:text-5xl lg:text-6xl font-light ml-4 text-muted-foreground">
+        <span className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-light ml-2 sm:ml-4 text-muted-foreground">
           dB
         </span>
       </div>
 
       {/* Max and Average values */}
-      <div className="text-center space-y-2 mb-16">
-        <p className="text-2xl md:text-3xl lg:text-4xl text-muted-foreground">
-          Max: <span className="text-foreground font-medium">{formatValue(maxDb)}</span> dB
+      <div className="text-center space-y-1 sm:space-y-2 mb-8 sm:mb-16">
+        <p className="text-lg sm:text-2xl md:text-3xl lg:text-4xl text-muted-foreground">
+          Max: <span className="text-foreground font-medium tabular-nums">{formatValue(maxDb)}</span> dB
         </p>
-        <p className="text-2xl md:text-3xl lg:text-4xl text-muted-foreground">
-          Avg: <span className="text-foreground font-medium">{formatValue(avgDb)}</span> dB
+        <p className="text-lg sm:text-2xl md:text-3xl lg:text-4xl text-muted-foreground">
+          Avg: <span className="text-foreground font-medium tabular-nums">{formatValue(avgDb)}</span> dB
         </p>
       </div>
 
       {/* Graph */}
       {showGraph && history.length > 1 && (
-        <div className="w-full max-w-4xl mb-16">
+        <div className="w-full max-w-4xl mb-8 sm:mb-16 px-2">
           <svg
             viewBox="0 0 800 120"
             className="w-full h-auto"
@@ -188,7 +205,7 @@ const SoundMeter = () => {
               d={generatePath()}
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
               className="text-foreground"
@@ -199,7 +216,7 @@ const SoundMeter = () => {
 
       {/* Timer during measurement */}
       {isActive && (
-        <p className="text-xl md:text-2xl text-muted-foreground mb-8">
+        <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-6 sm:mb-8 tabular-nums">
           {timeLeft}s
         </p>
       )}
@@ -208,7 +225,7 @@ const SoundMeter = () => {
       <button
         onClick={startMeasurement}
         disabled={isActive}
-        className="px-8 py-4 text-xl md:text-2xl border border-foreground text-foreground bg-transparent hover:bg-foreground hover:text-background transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground"
+        className="px-6 sm:px-8 py-3 sm:py-4 text-lg sm:text-xl md:text-2xl border border-foreground text-foreground bg-transparent hover:bg-foreground hover:text-background active:bg-foreground active:text-background transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground"
       >
         Start (30s)
       </button>
