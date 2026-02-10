@@ -1,5 +1,11 @@
 # Welcome to your Lovable project
 
+## 📱 iPhone/iOS Users
+
+**Not working on your iPhone?** See the [iPhone Troubleshooting Guide](./IPHONE_TROUBLESHOOTING.md) for solutions.
+
+**TL;DR:** This app requires HTTPS to work on iPhone. Make sure you're accessing the deployed version at your Lovable URL (not http://localhost).
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID

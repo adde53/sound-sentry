@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const MEASUREMENT_DURATION = 30; // seconds
 const GRAPH_SAMPLE_INTERVAL = 1; // seconds between graph samples
@@ -12,6 +13,7 @@ const SoundMeter = () => {
   const [timeLeft, setTimeLeft] = useState(MEASUREMENT_DURATION);
   const [history, setHistory] = useState<number[]>([]);
   const [showGraph, setShowGraph] = useState(false);
+  const { toast } = useToast();
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -56,11 +58,43 @@ const SoundMeter = () => {
 
   const startMeasurement = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast({
+          title: "Not Supported",
+          description: "Your browser doesn't support microphone access. Please use a modern browser.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if we're on HTTPS or localhost (required for iOS)
+      const isSecureContext = window.isSecureContext;
+      if (!isSecureContext) {
+        toast({
+          title: "Secure Connection Required",
+          description: "Microphone access requires HTTPS. Please access this site via HTTPS.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false,
+        }
+      });
       streamRef.current = stream;
 
-      const audioContext = new AudioContext();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
+
+      // Resume AudioContext (required for iOS)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
 
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
@@ -141,8 +175,72 @@ const SoundMeter = () => {
 
       animationRef.current = requestAnimationFrame(measure);
     } catch (error) {
-      console.error("Kunde inte komma åt mikrofonen:", error);
+      console.error("Could not access microphone:", error);
       setIsActive(false);
+
+      // Provide user-friendly error messages
+      if (error instanceof DOMException) {
+        switch (error.name) {
+          case 'NotAllowedError':
+          case 'PermissionDeniedError':
+            toast({
+              title: "Microphone Access Denied",
+              description: "Please allow microphone access in your browser settings and try again.",
+              variant: "destructive",
+            });
+            break;
+          case 'NotFoundError':
+          case 'DevicesNotFoundError':
+            toast({
+              title: "No Microphone Found",
+              description: "Please connect a microphone and try again.",
+              variant: "destructive",
+            });
+            break;
+          case 'NotReadableError':
+          case 'TrackStartError':
+            toast({
+              title: "Microphone In Use",
+              description: "Your microphone may be in use by another application. Please close other apps and try again.",
+              variant: "destructive",
+            });
+            break;
+          case 'OverconstrainedError':
+          case 'ConstraintNotSatisfiedError':
+            toast({
+              title: "Microphone Error",
+              description: "Your microphone doesn't meet the required specifications.",
+              variant: "destructive",
+            });
+            break;
+          case 'TypeError':
+            toast({
+              title: "Configuration Error",
+              description: "There was an error configuring the microphone.",
+              variant: "destructive",
+            });
+            break;
+          case 'SecurityError':
+            toast({
+              title: "Security Error",
+              description: "Microphone access is blocked. Please check your browser settings and ensure you're using HTTPS.",
+              variant: "destructive",
+            });
+            break;
+          default:
+            toast({
+              title: "Microphone Error",
+              description: `Could not access microphone: ${error.message}`,
+              variant: "destructive",
+            });
+        }
+      } else {
+        toast({
+          title: "Microphone Error",
+          description: "An unexpected error occurred while accessing the microphone.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
